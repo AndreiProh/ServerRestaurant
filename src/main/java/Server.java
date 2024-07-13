@@ -80,17 +80,17 @@ public class Server {
             if (typeOfMessage.equals(Const.AUTHORIZATION)) {
                 System.out.println("in IF authoriz");
 
-                //User user = new User();
                 user.setUserName(jsonMessage.get("username").getAsString());
                 user.setPassword(jsonMessage.get("password").getAsString());
 
-                DatabaseHandler dbHandler = new DatabaseHandler();
-                ResultSet resultset = dbHandler.getUser(user);
+                DatabaseHandler db = new DatabaseHandler();
+                user = db.getUser(user);
 
-                if (checkResultSet(resultset) > 0){
+                if (user.getId() != 0){
                     jsonMessage.addProperty(Const.STATUS, 1);
                     user.setAuthorized(true);
                     buy = new Buy(user);
+                    System.out.println(user.getId());
                 }else
                     jsonMessage.addProperty(Const.STATUS, 0);
                 sendMessage(jsonMessage);
@@ -99,14 +99,17 @@ public class Server {
             if (typeOfMessage.equals(Const.ORDER)) {
                 System.out.println("IN ORDER");
                 DatabaseHandler db = new DatabaseHandler();
-                if (jsonMessage.get(Const.STATUS).equals(Const.ADD))
+                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.ADD)) {
                     buy.addDishToOrder(db.getDish(jsonMessage.get(Const.ID_DISH).getAsInt()));
-
-                if (jsonMessage.get(Const.STATUS).equals(Const.SUBTRACT))
+                    System.out.println("IN ADD");
+                }
+                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.SUBTRACT)) {
                     buy.subDishFromOrder(jsonMessage.get(Const.ID_DISH).getAsInt());
-
-                if (jsonMessage.get(Const.STATUS).equals(Const.CONFIRM)) {
-
+                    System.out.println("IN SUB");
+                }
+                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.CONFIRM)) {
+                    System.out.println("IN CONFIRM");
+                    db.addBuy(buy);
                 }
 
 

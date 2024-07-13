@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class Buy {
@@ -51,6 +52,14 @@ public class Buy {
         this.orderDish = orderDish;
     }
 
+    public String toString() {
+        String str = "";
+        for (OrderDish od:orderDish) {
+            str += od.getDish().getName() + ":" + od.getQuantity() + " ";
+        }
+        return str;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -71,7 +80,7 @@ public class Buy {
     public void addDishToOrder(Dish dish) {
         int check = 0;
         for (OrderDish od:orderDish) {
-            if (od.getDish().getName() == dish.getName()) {
+            if (od.getDish().getId() == dish.getId()) {
                 od.setQuantity(od.getQuantity() + 1);
                 check++;
             }
@@ -81,15 +90,17 @@ public class Buy {
     }
 
     public void subDishFromOrder(int id) {
-        for (OrderDish od:orderDish) {
+        Iterator<OrderDish> iterator = orderDish.iterator();
+        while (iterator.hasNext()) {
+            OrderDish od = iterator.next();
             if (od.getDish().getId() == id) {
-                int quantity = od.getQuantity();
-                if (quantity > 1) {
-                    od.setQuantity(quantity - 1);
+                if (od.getQuantity() > 1) {
+                    od.setQuantity(od.getQuantity() - 1);
                 } else
-                    orderDish.remove(od);
+                    iterator.remove();
             }
         }
+
     }
 
 

@@ -1,8 +1,5 @@
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.ResultSet;
+import java.sql.*;
+import java.util.List;
 
 public class DatabaseHandler extends Configs {
     Connection dbConnection;
@@ -47,7 +44,7 @@ public class DatabaseHandler extends Configs {
             userRegisteredCode = 2;
         return userRegisteredCode;
     }
-    public ResultSet getUser(User user) {
+    public User getUser(User user) {
         ResultSet resSet = null;
         String select = "SELECT * FROM " + Const.USER_TABLE + " WHERE " +
                 Const.USER_NAME + "=? AND " + Const.USER_PASSWORD + "=?";
@@ -63,8 +60,16 @@ public class DatabaseHandler extends Configs {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
+            try {
+                resSet.next();
+                user.setId(resSet.getInt(1));
+                user.setFirstName(resSet.getString(Const.USER_LAST_NAME));
+                user.setFirstName(resSet.getString(Const.USER_FIRST_NAME));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
 
-        return resSet;
+        return user;
 
     }
 
@@ -93,21 +98,25 @@ public class DatabaseHandler extends Configs {
 
     }
 
-    public void addOrder(Buy buy) {
-        String insert = "INSERT INTO " + Const.BUY_TABLE + "(" +
-                Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ")" +
-                "VALUES(?,?)";
-        System.out.println(insert);
-
-        try {
-            PreparedStatement prSt = getDbConnection().prepareStatement(insert);
-            prSt.setString(1, buy.getDescription());
-            prSt.setString(2, Integer.toString(buy.getUser().getId()));
-            prSt.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+    public void addBuy(Buy buy) {
+        if (!buy.getOrderDish().isEmpty()) {
+            ResultSet resultSet = null;
+            String insert = "INSERT INTO " + Const.BUY_TABLE + "(" +
+                    Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ")" +
+                    "VALUES(?,?)";
+            try {
+                Connection connection = getDbConnection();
+                PreparedStatement prSt = connection.prepareStatement(insert);
+                prSt.setString(1, buy.getDescription());
+                prSt.setString(2, Integer.toString(buy.getUser().getId()));
+                prSt.executeUpdate();
+                buy.setId(getLastInsertID(connection));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+            addOrderDishFromBuy(buy);
         }
     }
     //Проверяем есть ли пользователь с таким логином.
@@ -130,6 +139,49 @@ public class DatabaseHandler extends Configs {
         int count = 0;
         while (result.next()) {
             count++;
+        }
+        return count;
+    }
+    private void addOrderDishFromBuy(Buy buy) {
+        String insert;
+        for (OrderDish od: buy.getOrderDish()) {
+            insert = "INSERT INTO " + Const.ORDER_DISH_TABLE +"(" +
+                    Const.BUY_ID + ", " + Const.DISH_ID + ", " + Const.ORDER_AMOUNT + ")" +
+                    "VALUES(?,?,?)";
+            try {
+                PreparedStatement prSt = getDbConnection().prepareStatement(insert);
+                prSt.setString(1, Integer.toString(buy.getId()));
+                prSt.setString(2, Integer.toString(od.getDish().getId()));
+                prSt.setString(3, Integer.toString(od.getQuantity()));
+                prSt.executeUpdate();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+    private int getLastInsertID(Connection connection) {
+        ResultSet resultSet = null;
+        String select = "SELECT LAST_INSERT_ID()";
+        try {
+            PreparedStatement prSt = connection.prepareStatement(select);
+            resultSet = prSt.executeQuery();
+            resultSet.next();
+            return resultSet.getInt(1);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private int checkResultSet(ResultSet resultSet){
+        int count = 0;
+        try {
+            while(resultSet.next()) {
+                count++;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
         return count;
     }
