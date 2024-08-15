@@ -1,4 +1,5 @@
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseHandler extends Configs {
@@ -66,7 +67,7 @@ public class DatabaseHandler extends Configs {
                 user.setFirstName(resSet.getString(Const.USER_LAST_NAME));
                 user.setFirstName(resSet.getString(Const.USER_FIRST_NAME));
             } catch (SQLException e) {
-                throw new RuntimeException(e);
+                user.setId(0);
             }
 
         return user;
@@ -90,7 +91,7 @@ public class DatabaseHandler extends Configs {
         }
         try {
             Dish dish = new Dish(id, resSet.getString("name_dish"),
-                    resSet.getInt("id_category"), resSet.getDouble("id_category") );
+                    resSet.getInt("id_category"), resSet.getDouble("price") );
             return dish;
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -98,7 +99,33 @@ public class DatabaseHandler extends Configs {
 
     }
 
-    public void addBuy(Buy buy) {
+    public Dish getDish(String name) {
+        ResultSet resSet = null;
+        String select = "SELECT * FROM " + Const.DISH_TABLE + " WHERE " +
+                Const.DISH_NAME + " =?";
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(select);
+            prSt.setString(1, name);
+            resSet = prSt.executeQuery();
+            resSet.next();
+            System.out.println(resSet.getString(2));
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            Dish dish = new Dish(resSet.getInt("id_dish"), resSet.getString("name_dish"),
+                    resSet.getInt("id_category"), resSet.getDouble("price") );
+            return dish;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    public int addBuy(Buy buy) {
+        int status = 0;
         if (!buy.getOrderDish().isEmpty()) {
             ResultSet resultSet = null;
             String insert = "INSERT INTO " + Const.BUY_TABLE + "(" +
@@ -111,13 +138,33 @@ public class DatabaseHandler extends Configs {
                 prSt.setString(2, Integer.toString(buy.getUser().getId()));
                 prSt.executeUpdate();
                 buy.setId(getLastInsertID(connection));
+                status = 1;
             } catch (SQLException e) {
-                throw new RuntimeException(e);
+                status = 2;
             } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
+                status = 2;
             }
             addOrderDishFromBuy(buy);
         }
+        return status;
+    }
+    public List<Dish> getListOfDish() throws SQLException {
+        List<Dish> list = new ArrayList<>();
+        ResultSet resultSet = null;
+        String select = "SELECT *FROM " + Const.DISH_TABLE;
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(select);
+            resultSet = prSt.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        while (resultSet.next()) {
+            list.add(new Dish(resultSet.getInt("id_dish"), resultSet.getString("name_dish"),
+                    resultSet.getInt("id_category"), resultSet.getDouble("price") ));
+        }
+        return list;
     }
     //Проверяем есть ли пользователь с таким логином.
     // Возвращает 0 если нет(количество пользователей с таким Логином)

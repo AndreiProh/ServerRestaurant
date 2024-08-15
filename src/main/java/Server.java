@@ -1,5 +1,7 @@
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.io.*;
@@ -7,6 +9,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class Server {
@@ -99,20 +103,57 @@ public class Server {
             if (typeOfMessage.equals(Const.ORDER)) {
                 System.out.println("IN ORDER");
                 DatabaseHandler db = new DatabaseHandler();
-                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.ADD)) {
-                    buy.addDishToOrder(db.getDish(jsonMessage.get(Const.ID_DISH).getAsInt()));
-                    System.out.println("IN ADD");
-                }
-                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.SUBTRACT)) {
-                    buy.subDishFromOrder(jsonMessage.get(Const.ID_DISH).getAsInt());
-                    System.out.println("IN SUB");
-                }
-                if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.CONFIRM)) {
-                    System.out.println("IN CONFIRM");
-                    db.addBuy(buy);
+                if (buy != null) {
+                    if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.ADD)) {
+                        Dish dish = db.getDish(jsonMessage.get(Const.ID_DISH).getAsInt());
+                        buy.addDishToOrder(dish);
+                        jsonMessage.addProperty("nameOfDish", dish.getName());
+                        jsonMessage.addProperty("priceOfDish", dish.getPrice());
+                        sendMessage(jsonMessage);
+                        System.out.println("IN ADD");
+                    }
+                    if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.SUBTRACT)) {
+                        buy.subDishFromOrder(jsonMessage.get(Const.ID_DISH).getAsInt());
+                        sendMessage(jsonMessage);
+                        System.out.println("IN SUB");
+                    }
+                    if (jsonMessage.get(Const.STATUS).getAsString().equals(Const.CONFIRM)) {
+                        System.out.println("IN CONFIRM");
+                        Map<String,Number> mapOrder = new HashMap<>();
+                        JsonElement mapElement = jsonMessage.get("dishes");
+                        mapOrder = new Gson().fromJson(mapElement, HashMap.class);
+                        for (Map.Entry<String,Number> entry : mapOrder.entrySet()) {
+                            for (int i = 0;i < entry.getValue().intValue(); i++) {
+                                buy.addDishToOrder(db.getDish(entry.getKey()));
+                            }
+
+                        }
+                        int statusOfOrder = db.addBuy(buy);
+                        jsonMessage.addProperty("status", statusOfOrder);
+                        sendMessage(jsonMessage);
+                    }
                 }
 
+            }
+            if (typeOfMessage.equals("exit")) {
+                System.out.println("IN EXIT");
+                user = new User();
+                buy = new Buy(user);
+                System.out.println(user.getId() +user.getUserName() + user.isAuthorized());
+                System.out.println(buy.getId() + buy.toString());
+                sendMessage(jsonMessage);
+            }
 
+            if (typeOfMessage.equals("update")) {
+                System.out.println("IN UPDATE");
+                DatabaseHandler db = new DatabaseHandler();
+                try {
+                    JsonArray jsonArray = new Gson().toJsonTree(db.getListOfDish()).getAsJsonArray();
+                    jsonMessage.add("dishes",jsonArray);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+                sendMessage(jsonMessage);
             }
 
 

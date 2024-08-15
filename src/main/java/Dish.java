@@ -10,6 +10,12 @@ public class Dish {
         this.category = category;
         this.price = price;
     }
+    public Dish() {
+        this.id = 0;
+        this.name = null;
+        this.category = 0;
+        this.price = 0;
+    }
 
     public int getId() {
         return id;
