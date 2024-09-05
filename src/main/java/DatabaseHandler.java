@@ -1,6 +1,7 @@
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 public class DatabaseHandler extends Configs {
     Connection dbConnection;
@@ -126,25 +127,30 @@ public class DatabaseHandler extends Configs {
 
     public int addBuy(Buy buy) {
         int status = 0;
+        System.out.println(buy.getOrderDish().isEmpty());
         if (!buy.getOrderDish().isEmpty()) {
             ResultSet resultSet = null;
             String insert = "INSERT INTO " + Const.BUY_TABLE + "(" +
-                    Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ")" +
-                    "VALUES(?,?)";
+                    Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ", status, date " + ")" +
+                    "VALUES(?,?,?,NOW())";
             try {
                 Connection connection = getDbConnection();
                 PreparedStatement prSt = connection.prepareStatement(insert);
                 prSt.setString(1, buy.getDescription());
                 prSt.setString(2, Integer.toString(buy.getUser().getId()));
+                prSt.setString(3,"Готовится");
                 prSt.executeUpdate();
                 buy.setId(getLastInsertID(connection));
+                addOrderDishFromBuy(buy);
+                addDelivery(buy.getId());
+                addPayment(buy);
                 status = 1;
             } catch (SQLException e) {
                 status = 2;
             } catch (ClassNotFoundException e) {
                 status = 2;
             }
-            addOrderDishFromBuy(buy);
+
         }
         return status;
     }
@@ -206,6 +212,42 @@ public class DatabaseHandler extends Configs {
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    private void addDelivery(int id_buy) {
+        System.out.println("IN DELIVERY");
+        String insert = "INSERT INTO deliveries(id_buy, id_courier, status_delivery, time_delivery)" +
+                " VALUES(?,?,?,NOW())";
+        int id_courier = new Random().nextInt(3) + 1;
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(insert);
+            prSt.setString(1, Integer.toString(id_buy));
+            prSt.setString(2, Integer.toString(id_courier));
+            prSt.setString(3, "Назначен");
+            prSt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private void addPayment(Buy buy) {
+        System.out.println("IN PAYMENT");
+        String insert = "INSERT INTO payments(id_buy, payment_date, amount, payment_method)" +
+                " VALUES(?,NOW(),?,?)";
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(insert);
+            prSt.setString(1, Integer.toString(buy.getId()));
+            prSt.setString(2, Double.toString(buy.getTotalOrderPrice()));
+            prSt.setString(3, "Карта");
+            prSt.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
         }
     }
     private int getLastInsertID(Connection connection) {
