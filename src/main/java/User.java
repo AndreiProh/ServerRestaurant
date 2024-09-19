@@ -5,6 +5,7 @@ public class User {
     private  String firstName;
     private String password;
     private boolean authorized;
+    private String userStatus;
 
     public User(String userName, String lastName, String firstName, String password) {
         this.userName = userName;
@@ -78,5 +79,25 @@ public class User {
 
     public void setAuthorized(boolean authorized) {
         this.authorized = authorized;
+    }
+
+    public String getUserStatus() {
+        return userStatus;
+    }
+
+    public void setUserStatus(String userStatus) {
+        this.userStatus = userStatus;
+    }
+
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", userName='" + userName + '\'' +
+                ", lastName='" + lastName + '\'' +
+                ", firstName='" + firstName + '\'' +
+                ", password='" + password + '\'' +
+                ", authorized=" + authorized +
+                ", userStatus='" + userStatus + '\'' +
+                '}';
     }
 }

@@ -1,4 +1,5 @@
 public class OrderDish {
+    private int idBuy;
     private Dish dish;
     private int quantity;
 

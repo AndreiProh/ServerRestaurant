@@ -141,13 +141,34 @@ public class Server {
             user = db.getUser(user);
 
             if (user.getId() != 0){
-                jsonMessage.addProperty(Const.STATUS, 1);
-                user.setAuthorized(true);
-                buy = new Buy(user);
-                System.out.println(user.getId());
+                if (user.getUserStatus().equals("client")) {
+                    jsonMessage.addProperty(Const.STATUS, 1);
+                    user.setAuthorized(true);
+                    buy = new Buy(user);
+                    System.out.println(user.getId());
+                }
+                if (user.getUserStatus().equals("admin")) {
+                    jsonMessage.addProperty(Const.STATUS, 2);
+                    try {
+                        JsonArray jsonArray = new Gson().toJsonTree(db.getListOfOrderDTO()).getAsJsonArray();
+                        jsonMessage.add("orders",jsonArray);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                if (user.getUserStatus().equals("courier")) {
+                    jsonMessage.addProperty(Const.STATUS, 3);
+                    try {
+                        JsonArray jsonArray = new Gson().toJsonTree(db.getListOfDelivery()).getAsJsonArray();
+                        jsonMessage.add("deliveries",jsonArray);
+                    } catch (SQLException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }else
                 jsonMessage.addProperty(Const.STATUS, 0);
             sendMessage(jsonMessage);
+
         }
 
         private void handleLogUpMessage(JsonObject jsonMessage) {
@@ -175,7 +196,6 @@ public class Server {
                 }
             return count;
         }
-
 
 
         private void sendMessage(JsonObject jsonObject) {

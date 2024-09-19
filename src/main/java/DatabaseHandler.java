@@ -1,7 +1,7 @@
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.util.*;
 
 public class DatabaseHandler extends Configs {
     Connection dbConnection;
@@ -48,7 +48,9 @@ public class DatabaseHandler extends Configs {
     }
     public User getUser(User user) {
         ResultSet resSet = null;
-        String select = "SELECT * FROM " + Const.USER_TABLE + " WHERE " +
+        String select = "SELECT * FROM " + Const.USER_TABLE +
+                " JOIN user_status on user.id_user_status = user_status.id_user_status  " +
+                "WHERE " +
                 Const.USER_NAME + "=? AND " + Const.USER_PASSWORD + "=?";
 
         try {
@@ -65,8 +67,9 @@ public class DatabaseHandler extends Configs {
             try {
                 resSet.next();
                 user.setId(resSet.getInt(1));
-                user.setFirstName(resSet.getString(Const.USER_LAST_NAME));
+                user.setLastName(resSet.getString(Const.USER_LAST_NAME));
                 user.setFirstName(resSet.getString(Const.USER_FIRST_NAME));
+                user.setUserStatus(resSet.getString("name_status"));
             } catch (SQLException e) {
                 user.setId(0);
             }
@@ -171,6 +174,121 @@ public class DatabaseHandler extends Configs {
                     resultSet.getInt("id_category"), resultSet.getDouble("price") ));
         }
         return list;
+    }
+
+    public List<Delivery> getListOfDelivery() throws SQLException {
+        List<Delivery> list = new ArrayList<>();
+        ResultSet resultSet = null;
+        String select = "SELECT id_delivery, deliveries.id_buy, id_courier, address, status_delivery, start_time_delivery, finish_time_delivery\n" +
+                "from deliveries \n" +
+                "join buy on deliveries.id_buy = buy.id_buy\n" +
+                "join user on buy.id_user = user.id_user;";  // Константа для таблицы доставки
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(select);
+            resultSet = prSt.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        while (resultSet.next()) {
+            list.add(new Delivery(
+                    resultSet.getInt("id_delivery"),
+                    resultSet.getInt("id_buy"),
+                    resultSet.getInt("id_courier"),
+                    resultSet.getString("address"),
+                    resultSet.getString("status_delivery"),
+                    new SimpleDateFormat("yyyy-MM-dd:HH:mm:ss").format(resultSet.getTimestamp("start_time_delivery"))
+            ));
+        }
+        return list;
+    }
+
+    public List<Payment> getListPayment() throws SQLException {
+        List<Payment> list = new ArrayList<>();
+        ResultSet resultSet = null;
+
+        String select = "SELECT id_payment, id_buy, amount, payment_method, payment_status, payment_date " +
+                        "FROM  payments";
+
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(select);
+            resultSet = prSt.executeQuery();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
+        while (resultSet.next()) {
+            list.add(new Payment(
+                    resultSet.getInt("id_payment"),
+                    resultSet.getInt("id_buy"),
+                    resultSet.getDouble("amount"),
+                    resultSet.getString("payment_method"),
+                    resultSet.getString("payment_status"),
+                    new SimpleDateFormat("yyyy-MM-dd:HH:mm:ss").format(resultSet.getTimestamp("payment_date"))
+            ));
+        }
+
+        return list;
+    }
+
+    public List<OrderDTO> getListOfOrderDTO() throws SQLException {
+        List<OrderDTO> orderList = new ArrayList<>();
+        ResultSet buyResultSet = null;
+        ResultSet orderDishResultSet = null;
+
+        // SQL запрос для получения информации о заказах из таблицы buy
+        String selectBuyQuery = "SELECT id_buy, buy_description, buy_start_time FROM buy";
+
+        try {
+            // Получение данных из таблицы buy
+            PreparedStatement buyStatement = getDbConnection().prepareStatement(selectBuyQuery);
+            buyResultSet = buyStatement.executeQuery();
+
+            while (buyResultSet.next()) {
+                int idBuy = buyResultSet.getInt("id_buy");
+                String orderNotes = buyResultSet.getString("buy_description");
+                String orderDateTime = buyResultSet.getTimestamp("buy_start_time").toString();
+
+                // Создаем пустую Map для блюд и их количества
+                Map<String, Integer> dishes = new HashMap<>();
+
+                // SQL запрос для получения информации о блюдах для конкретного заказа
+                String selectOrderDishQuery = "SELECT d.name_dish, od.amount FROM order_dish od "
+                        + "JOIN dish d ON od.id_dish = d.id_dish WHERE od.id_buy = ?";
+
+                // Получение данных из таблицы order_dish по id_buy
+                PreparedStatement orderDishStatement = getDbConnection().prepareStatement(selectOrderDishQuery);
+                orderDishStatement.setInt(1, idBuy);
+                orderDishResultSet = orderDishStatement.executeQuery();
+
+                // Заполняем Map блюдами и их количеством
+                while (orderDishResultSet.next()) {
+                    String dishName = orderDishResultSet.getString("name_dish");
+                    int quantity = orderDishResultSet.getInt("amount");
+                    dishes.put(dishName, quantity);
+                }
+
+                // Создаем объект OrderDTO и добавляем его в список
+                OrderDTO order = new OrderDTO(idBuy, dishes, orderNotes, orderDateTime);
+                orderList.add(order);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error while fetching order data", e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Database connection error", e);
+        } finally {
+            // Закрываем resultSetы и statementы после использования
+            if (buyResultSet != null) {
+                buyResultSet.close();
+            }
+            if (orderDishResultSet != null) {
+                orderDishResultSet.close();
+            }
+        }
+        return orderList;
     }
     //Проверяем есть ли пользователь с таким логином.
     // Возвращает 0 если нет(количество пользователей с таким Логином)
