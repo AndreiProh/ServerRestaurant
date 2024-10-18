@@ -1,14 +1,16 @@
 public class Dish {
     private int id;
     private String name;
+    private String description;
     private int category;
     private double price;
 
-    public Dish(int id, String name, int category, double price) {
+    public Dish(int id, String name, int category, double price, String description) {
         this.id = id;
         this.name = name;
         this.category = category;
         this.price = price;
+        this.description = description;
     }
     public Dish() {
         this.id = 0;
@@ -47,6 +49,14 @@ public class Dish {
 
     public void setPrice(double price) {
         this.price = price;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public String toString() {

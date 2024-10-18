@@ -4,7 +4,10 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public class DatabaseHandler extends Configs {
+    //Пееменная для хранения текущего соединения с базой данных
     Connection dbConnection;
+    //Метод настраивает и устанавливает соединение с базой данных
+    //Параметры подключения содержатся в классе Configs:
     public Connection getDbConnection()
             throws ClassNotFoundException, SQLException {
         String connectionString = "jdbc:mysql://" + dbHost + ":"
@@ -14,6 +17,9 @@ public class DatabaseHandler extends Configs {
                 dbUser, dbPass);
         return dbConnection;
     }
+    //Метод записывает в БД пользователя,
+    //возвращает ноль если такой пользователь
+    //уже существует:
     public int signUpUser(User user){
         int amountUsers = 0;
         int userRegisteredCode = 0;
@@ -95,7 +101,8 @@ public class DatabaseHandler extends Configs {
         }
         try {
             Dish dish = new Dish(id, resSet.getString("name_dish"),
-                    resSet.getInt("id_category"), resSet.getDouble("price") );
+                    resSet.getInt("id_category"), resSet.getDouble("price"),
+                    resSet.getString("description"));
             return dish;
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -120,7 +127,8 @@ public class DatabaseHandler extends Configs {
         }
         try {
             Dish dish = new Dish(resSet.getInt("id_dish"), resSet.getString("name_dish"),
-                    resSet.getInt("id_category"), resSet.getDouble("price") );
+                    resSet.getInt("id_category"), resSet.getDouble("price"),
+                    resSet.getString("description") );
             return dish;
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -130,11 +138,10 @@ public class DatabaseHandler extends Configs {
 
     public int addBuy(Buy buy) {
         int status = 0;
-        System.out.println(buy.getOrderDish().isEmpty());
         if (!buy.getOrderDish().isEmpty()) {
             ResultSet resultSet = null;
             String insert = "INSERT INTO " + Const.BUY_TABLE + "(" +
-                    Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ", status, date " + ")" +
+                    Const.BUY_DESCRIPTION + " ," + Const.USER_ID + ", status, buy_start_time " + ")" +
                     "VALUES(?,?,?,NOW())";
             try {
                 Connection connection = getDbConnection();
@@ -145,13 +152,14 @@ public class DatabaseHandler extends Configs {
                 prSt.executeUpdate();
                 buy.setId(getLastInsertID(connection));
                 addOrderDishFromBuy(buy);
-                addDelivery(buy.getId());
                 addPayment(buy);
                 status = 1;
             } catch (SQLException e) {
                 status = 2;
+                throw new RuntimeException(e);
             } catch (ClassNotFoundException e) {
                 status = 2;
+                throw new RuntimeException(e);
             }
 
         }
@@ -171,7 +179,8 @@ public class DatabaseHandler extends Configs {
         }
         while (resultSet.next()) {
             list.add(new Dish(resultSet.getInt("id_dish"), resultSet.getString("name_dish"),
-                    resultSet.getInt("id_category"), resultSet.getDouble("price") ));
+                    resultSet.getInt("id_category"), resultSet.getDouble("price"),
+                    resultSet.getString("description") ));
         }
         return list;
     }
@@ -182,7 +191,8 @@ public class DatabaseHandler extends Configs {
         String select = "SELECT id_delivery, deliveries.id_buy, id_courier, address, status_delivery, start_time_delivery, finish_time_delivery\n" +
                 "from deliveries \n" +
                 "join buy on deliveries.id_buy = buy.id_buy\n" +
-                "join user on buy.id_user = user.id_user;";  // Константа для таблицы доставки
+                "join user on buy.id_user = user.id_user " +
+                "HAVING status_delivery ='Назначен'";
         try {
             PreparedStatement prSt = getDbConnection().prepareStatement(select);
             resultSet = prSt.executeQuery();
@@ -240,7 +250,8 @@ public class DatabaseHandler extends Configs {
         ResultSet orderDishResultSet = null;
 
         // SQL запрос для получения информации о заказах из таблицы buy
-        String selectBuyQuery = "SELECT id_buy, buy_description, buy_start_time FROM buy";
+        String selectBuyQuery = "SELECT id_buy, buy_description, buy_start_time FROM buy" +
+                " WHERE status='Готовится'";
 
         try {
             // Получение данных из таблицы buy
@@ -290,6 +301,23 @@ public class DatabaseHandler extends Configs {
         }
         return orderList;
     }
+    public int confirmReadyOrder(int id) {
+        System.out.println("in confirmReadyOrder");
+        int executeStatus = 0;
+        String update = "UPDATE buy SET status = 'Готов' where id_buy =?";
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(update);
+            prSt.setString(1, Integer.toString(id));
+            prSt.executeUpdate();
+            addDelivery(id);
+            executeStatus = 1;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return executeStatus;
+    }
     //Проверяем есть ли пользователь с таким логином.
     // Возвращает 0 если нет(количество пользователей с таким Логином)
     private int checkUserName(User user) throws SQLException {
@@ -334,8 +362,7 @@ public class DatabaseHandler extends Configs {
     }
 
     private void addDelivery(int id_buy) {
-        System.out.println("IN DELIVERY");
-        String insert = "INSERT INTO deliveries(id_buy, id_courier, status_delivery, time_delivery)" +
+        String insert = "INSERT INTO deliveries(id_buy, id_courier, status_delivery, start_time_delivery)" +
                 " VALUES(?,?,?,NOW())";
         int id_courier = new Random().nextInt(3) + 1;
         try {
@@ -353,7 +380,6 @@ public class DatabaseHandler extends Configs {
     }
 
     private void addPayment(Buy buy) {
-        System.out.println("IN PAYMENT");
         String insert = "INSERT INTO payments(id_buy, payment_date, amount, payment_method)" +
                 " VALUES(?,NOW(),?,?)";
         try {
@@ -393,4 +419,20 @@ public class DatabaseHandler extends Configs {
         return count;
     }
 
+    public int changeStatusDelivery(int id, String status) {
+        int executeStatus = 0;
+        String update = "UPDATE deliveries SET status_delivery =? where id_delivery =?";
+        try {
+            PreparedStatement prSt = getDbConnection().prepareStatement(update);
+            prSt.setString(1, status);
+            prSt.setString(2, Integer.toString(id));
+            prSt.executeUpdate();
+            executeStatus = 1;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        return executeStatus;
+    }
 }
